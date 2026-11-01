@@ -1,0 +1,197 @@
+"""
+Grocery Price Alerts
+Fetches daily mandi (wholesale) prices from data.gov.in, compares them with the
+previous saved day, and sends a summary to Telegram.
+
+Setup (set these as environment variables, never paste keys into the code):
+    DATA_GOV_API_KEY    your data.gov.in API key            (required)
+    TELEGRAM_BOT_TOKEN  token from @BotFather               (optional)
+    TELEGRAM_CHAT_ID    your chat id                        (optional)
+
+Run:
+    python grocery_alerts.py
+If the Telegram variables are missing, the message is just printed.
+"""
+
+import csv
+import os
+import sys
+from datetime import date
+from pathlib import Path
+from statistics import mean
+
+import requests
+
+# Windows consoles can fail on the rupee sign and arrows; force UTF-8 output.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+# ======================================================================
+# SETTINGS - change these to suit you
+# ======================================================================
+STATE = "Uttar Pradesh"
+COMMODITIES = ["Onion", "Potato", "Tomato", "Rice", "Wheat", "Garlic"]
+ALERT_THRESHOLD_PERCENT = 10  # mark items that moved this much or more
+
+API_URL = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
+HISTORY_FILE = Path(__file__).parent / "prices_history.csv"
+
+
+# ======================================================================
+# STEP 1: Fetch prices from the API
+# ======================================================================
+def fetch_modal_prices(commodity, api_key):
+    """Return a list of today's modal prices (Rs per kg) across markets in STATE."""
+    params = {
+        "api-key": api_key,
+        "format": "json",
+        "limit": 200,
+        "filters[state.keyword]": STATE,
+        "filters[commodity]": commodity,
+    }
+    response = requests.get(API_URL, params=params, timeout=30)
+    response.raise_for_status()
+    records = response.json().get("records", [])
+
+    prices = []
+    for record in records:
+        try:
+            # The API gives Rs per quintal (100 kg), so divide by 100 for per kg.
+            prices.append(float(record["modal_price"]) / 100)
+        except (KeyError, TypeError, ValueError):
+            continue  # skip rows with missing or bad prices
+    return prices
+
+
+def get_today_prices(api_key):
+    """Return {commodity: average price per kg} for every commodity with data."""
+    today = {}
+    for commodity in COMMODITIES:
+        try:
+            prices = fetch_modal_prices(commodity, api_key)
+        except requests.RequestException as error:
+            print(f"Could not fetch {commodity}: {error}")
+            continue
+
+        if prices:
+            today[commodity] = round(mean(prices), 2)
+            print(f"{commodity}: {len(prices)} markets, average Rs {today[commodity]}/kg")
+        else:
+            print(f"{commodity}: no data returned (check the name or state)")
+    return today
+
+
+# ======================================================================
+# STEP 2: Save each day's prices to a CSV file
+# ======================================================================
+def load_history():
+    """Return a list of rows: {"date", "commodity", "price"}."""
+    if not HISTORY_FILE.exists():
+        return []
+    with open(HISTORY_FILE, newline="", encoding="utf-8") as file:
+        return list(csv.DictReader(file))
+
+
+def save_today(history, today_prices):
+    """Replace any rows for today's date, then write the file again."""
+    today_str = date.today().isoformat()
+    history = [row for row in history if row["date"] != today_str]
+    for commodity, price in today_prices.items():
+        history.append({"date": today_str, "commodity": commodity, "price": price})
+
+    with open(HISTORY_FILE, "w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=["date", "commodity", "price"])
+        writer.writeheader()
+        writer.writerows(history)
+
+
+# ======================================================================
+# STEP 3: Compare today with the previous saved day
+# ======================================================================
+def previous_price(history, commodity):
+    """Latest saved price for this commodity from before today, or None."""
+    today_str = date.today().isoformat()
+    older = [
+        row for row in history
+        if row["commodity"] == commodity and row["date"] < today_str
+    ]
+    if not older:
+        return None
+    latest = max(older, key=lambda row: row["date"])
+    return float(latest["price"])
+
+
+# ======================================================================
+# STEP 4: Build the message
+# ======================================================================
+def build_message(today_prices, history):
+    lines = [f"Grocery prices - {date.today().strftime('%d %b %Y')}"]
+    lines.append(f"{STATE}, average mandi wholesale rate per kg")
+    lines.append("")
+
+    for commodity, price in today_prices.items():
+        before = previous_price(history, commodity)
+
+        if before is None:
+            lines.append(f"{commodity}: Rs {price:.2f}  (first record)")
+            continue
+
+        change = price - before
+        percent = (change / before) * 100 if before else 0
+
+        if change > 0:
+            arrow = "↑"
+        elif change < 0:
+            arrow = "↓"
+        else:
+            arrow = "→"
+
+        flag = " ⚠" if abs(percent) >= ALERT_THRESHOLD_PERCENT else ""
+        lines.append(
+            f"{commodity}: Rs {price:.2f}  {arrow} Rs {abs(change):.2f} "
+            f"({percent:+.1f}%){flag}"
+        )
+
+    lines.append("")
+    lines.append("Wholesale mandi rates; shop prices will be higher.")
+    return "\n".join(lines)
+
+
+# ======================================================================
+# STEP 5: Send to Telegram
+# ======================================================================
+def send_telegram(message):
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+
+    if not token or not chat_id:
+        print("\nTelegram not configured, so here is the message:\n")
+        print(message)
+        return
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    response = requests.post(url, data={"chat_id": chat_id, "text": message}, timeout=30)
+    if response.ok:
+        print("Message sent to Telegram.")
+    else:
+        print(f"Telegram error: {response.status_code} {response.text}")
+
+
+# ======================================================================
+# MAIN: runs all the steps in order
+# ======================================================================
+def main():
+    api_key = os.environ.get("DATA_GOV_API_KEY")
+    if not api_key:
+        print("Missing DATA_GOV_API_KEY. Set it first (see the top of this file).")
+        sys.exit(1)
+
+    today_prices = get_today_prices(api_key)
+    if not today_prices:
+        print("No prices fetched, so nothing to save or send.")
+        sys.exit(1)
+
+    history = load_history()
+    message = build_message(today_prices, history)  # compare BEFORE saving today
+    save_today(history, today_prices)
+    send_telegram(message)

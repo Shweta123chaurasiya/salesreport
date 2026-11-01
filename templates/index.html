@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chakia Grocery Market</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #193128;
+      background: #f4f7f2;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { padding: 2rem max(1rem, calc((100% - 1100px) / 2)); background: #174c37; color: white; }
+    header h1 { margin: 0 0 .5rem; font-size: clamp(1.8rem, 5vw, 2.6rem); }
+    header p { margin: 0; max-width: 680px; line-height: 1.5; color: #e1eee7; }
+    nav { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; max-width: 1100px; margin: 1rem auto 0; padding: 0 1rem; }
+    nav a { color: #174c37; font-weight: 650; text-decoration: none; padding: .5rem .65rem; }
+    nav a:hover { text-decoration: underline; }
+    nav #account-actions { display: flex; gap: .5rem; margin-left: auto; }
+    main { max-width: 1100px; margin: 1rem auto; padding: 0 1rem 2rem; }
+    section { margin: 1rem 0; padding: 1.25rem; border: 1px solid #dce6dc; border-radius: 12px; background: white; }
+    h2 { margin: 0 0 1rem; font-size: 1.25rem; }
+    h3 { margin: 0 0 .4rem; font-size: 1.05rem; }
+    label { display: block; margin: .65rem 0 .3rem; font-weight: 600; }
+    input, select, textarea { width: 100%; padding: .65rem; border: 1px solid #aebdb0; border-radius: 7px; font: inherit; }
+    textarea { min-height: 76px; resize: vertical; }
+    button, .button { display: inline-block; margin-top: .8rem; padding: .65rem 1rem; border: 0; border-radius: 7px; background: #216b4b; color: white; font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; }
+    button:hover, .button:hover { background: #174c37; }
+    button.secondary { background: #edf3ed; color: #193128; border: 1px solid #dce6dc; }
+    button.secondary:hover { background: #dfeae0; }
+    button.danger { background: #9b352e; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .3rem 1rem; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .filters { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: .8rem; align-items: end; }
+    .filters label { margin-top: 0; }
+    .hint, .status { color: #52665a; line-height: 1.5; }
+    .status { min-height: 1.5rem; margin: .65rem 0 0; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 620px; }
+    th, td { padding: .7rem .55rem; border-bottom: 1px solid #e3eae3; text-align: left; }
+    th { color: #52665a; font-size: .88rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .9rem; }
+    .card { padding: 1rem; border: 1px solid #e3eae3; border-radius: 10px; }
+    .card-top { display: flex; justify-content: space-between; align-items: start; gap: .5rem; }
+    .price { color: #174c37; font-size: 1.25rem; font-weight: 750; white-space: nowrap; }
+    .badge { display: inline-block; padding: .2rem .5rem; border-radius: 999px; background: #edf3ed; color: #385b45; font-size: .82rem; }
+    .shopline, .meta { color: #52665a; font-size: .92rem; line-height: 1.5; }
+    .actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+    .actions button { margin-top: .5rem; }
+    .commodity-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .25rem 1rem; max-width: 650px; }
+    .commodity-list label, .consent { display: flex; align-items: flex-start; gap: .55rem; font-weight: 400; }
+    .commodity-list input, .consent input { width: auto; margin-top: .25rem; }
+    .hidden { display: none !important; }
+    .empty { padding: 1rem 0; color: #52665a; }
+    @media (max-width: 700px) {
+      header { padding-top: 1.6rem; padding-bottom: 1.6rem; }
+      .form-grid, .filters { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: auto; }
+      nav #account-actions { margin-left: 0; }
+      section { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Chakia Grocery Market</h1>
+    <p>Find grocery prices from local shops and check the latest wholesale mandi rates across Uttar Pradesh.</p>
+  </header>
+  <nav aria-label="Main navigation">
+    <a href="#marketplace">Marketplace</a>
+    <a href="#mandi-prices">Mandi rates</a>
+    <a href="#whatsapp-alerts">WhatsApp alerts</a>
+    <div id="account-actions"></div>
+  </nav>
+  <main>
+    <section id="marketplace" aria-labelledby="market-title">
+      <h2 id="market-title">Local grocery listings</h2>
+      <div class="filters">
+        <label>District
+          <select id="market-district"></select>
+        </label>
+        <label>Category
+          <select id="market-category"></select>
+        </label>
+        <label>Search
+          <input id="market-search" type="search" maxlength="80" placeholder="Search grocery or shop">
+        </label>
+      </div>
+      <p id="market-status" class="status" role="status"></p>
+      <div id="market-listings" class="cards"></div>
+    </section>
+
+    <section id="shop-account" aria-labelledby="account-title">
+      <h2 id="account-title">Shopkeeper account</h2>
+      <div id="signed-out">
+        <p class="hint">Create a shop account to publish grocery prices and manage your listings.</p>
+        <div class="form-grid">
+          <form id="login-form">
+            <h3>Sign in</h3>
+            <label>Email <input name="email" type="email" autocomplete="username" required></label>
+            <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+            <button type="submit">Sign in</button>
+          </form>
+          <form id="register-form">
+            <h3>Create shop account</h3>
+            <label>Shop name <input name="shop_name" maxlength="100" required></label>
+            <label>Email <input name="email" type="email" autocomplete="username" required></label>
+            <label>WhatsApp / mobile <input name="phone" type="tel" inputmode="tel" placeholder="9876543210" required></label>
+            <label>District <select name="district" class="district-select" required></select></label>
+            <label>Password <input name="password" type="password" minlength="8" autocomplete="new-password" required></label>
+            <button type="submit">Create account</button>
+          </form>
+        </div>
+      </div>
+      <div id="seller-dashboard" class="hidden">
+        <p id="seller-welcome" class="hint"></p>
+        <form id="listing-form">
+          <h3 id="listing-form-title">Publish a grocery listing</h3>
+          <div class="form-grid">
+            <label>Product name <input name="name" maxlength="100" placeholder="e.g. Basmati rice" required></label>
+            <label>Category <select name="category" class="category-select" required></select></label>
+            <label>Price (Rs) <input name="price" type="number" min="0.01" max="1000000" step="0.01" required></label>
+            <label>Unit
+              <select name="unit" required>
+                <option value="kg">kg</option><option value="g">g</option>
+                <option value="piece">piece</option><option value="dozen">dozen</option>
+                <option value="litre">litre</option><option value="pack">pack</option>
+                <option value="quintal">quintal</option>
+              </select>
+            </label>
+            <label>Quantity in stock <input name="stock" type="number" min="0" max="1000000" step="1" value="1" required></label>
+            <label>District <select name="district" class="district-select" required></select></label>
+            <label class="full">Details <textarea name="description" maxlength="500" placeholder="Optional grade, brand, or pickup details"></textarea></label>
+          </div>
+          <div class="actions">
+            <button type="submit">Publish listing</button>
+            <button id="cancel-edit" type="button" class="secondary hidden">Cancel edit</button>
+          </div>
+        </form>
+        <h3 style="margin-top:1.5rem">My listings</h3>
+        <p id="dashboard-status" class="status" role="status"></p>
+        <div id="my-listings" class="cards"></div>
+        <button id="logout-button" type="button" class="secondary">Sign out</button>
+      </div>
+    </section>
+
+    <section id="mandi-prices" aria-labelledby="prices-title">
+      <h2 id="prices-title">Latest mandi rates</h2>
+      <label for="price-district">District</label>
+      <select id="price-district"></select>
+      <p class="hint">Wholesale mandi modal prices converted from Rs/quintal to Rs/kg; not retail shop prices.</p>
+      <p id="price-status" class="status" role="status"></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>District</th><th>Mandi</th><th>Reported</th><th>Rs/kg</th></tr></thead>
+          <tbody id="price-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="whatsapp-alerts" aria-labelledby="subscribe-title">
+      <h2 id="subscribe-title">Daily mandi digest on WhatsApp</h2>
+      <form id="subscribe-form">
+        <label for="subscription-phone">Indian mobile number</label>
+        <input id="subscription-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="9876543210" required>
+        <label for="subscription-district">District</label>
+        <select id="subscription-district" class="district-select" required></select>
+        <p class="hint">Choose the grocery items to include:</p>
+        <div id="commodity-options" class="commodity-list"></div>
+        <label class="consent">
+          <input id="consent" type="checkbox" required>
+          <span>I agree to receive daily grocery price digests on WhatsApp. I can cancel using this browser.</span>
+        </label>
+        <button type="submit">Subscribe</button>
+      </form>
+      <p id="subscription-status" class="status" role="status"></p>
+      <div id="manage-subscription" class="hidden">
+        <button id="unsubscribe-button" type="button" class="secondary">Cancel my subscription</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    const savedSubscriptionKey = "upMandiSubscription";
+    const priceDistrict = document.querySelector("#price-district");
+    const priceRows = document.querySelector("#price-rows");
+    const priceStatus = document.querySelector("#price-status");
+    const subscriptionStatus = document.querySelector("#subscription-status");
+    const marketStatus = document.querySelector("#market-status");
+    const marketListings = document.querySelector("#market-listings");
+    const dashboardStatus = document.querySelector("#dashboard-status");
+    let currentUser = null;
+    let editingListingId = null;
+
+    async function api(url, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers }
+      });
+      const result = response.status === 204 ? {} : await response.json();
+      if (!response.ok) throw new Error(result.error || "Request failed.");
+      return result;
+    }
+
+    function addOptions(select, values, firstLabel = null) {
+      select.replaceChildren();
+      if (firstLabel) {
+        const first = document.createElement("option");
+        first.value = "";
+        first.textContent = firstLabel;
+        select.append(first);
+      }
+      for (const value of values) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.append(option);
+      }
+    }
+
+    async function loadDistricts() {
+      const districts = await api("/api/districts");
+      for (const select of document.querySelectorAll(".district-select")) addOptions(select, districts);
+      addOptions(document.querySelector("#market-district"), districts, "All districts");
+      addOptions(priceDistrict, districts);
+      priceDistrict.value = districts.includes("Chandauli") ? "Chandauli" : districts[0];
+      for (const select of document.querySelectorAll(".district-select")) {
+        if (districts.includes("Chandauli")) select.value = "Chandauli";
+      }
+    }
+
+    async function loadCategories() {
+      const categories = await api("/api/commodities");
+      for (const select of document.querySelectorAll(".category-select")) addOptions(select, [...categories, "Other"]);
+      addOptions(document.querySelector("#market-category"), categories, "All categories");
+      const option = document.createElement("option");
+      option.value = "Other";
+      option.textContent = "Other";
+      document.querySelector("#market-category").append(option);
+      const list = document.querySelector("#commodity-options");
+      for (const commodity of categories) {
+        const label = document.createElement("label");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.name = "commodities";
+        checkbox.value = commodity;
+        checkbox.checked = true;
+        const text = document.createElement("span");
+        text.textContent = commodity;
+        label.append(checkbox, text);
+        list.append(label);
+      }
+    }
+
+    async function loadPrices() {
+      priceStatus.textContent = "Loading latest reported prices…";
+      priceRows.replaceChildren();
+      const prices = await api(`/api/prices?district=${encodeURIComponent(priceDistrict.value)}`);
+      if (!prices.length) {
+        priceStatus.textContent = "No rates cached yet. The app owner must run the daily refresh.";
+        return;
+      }
+      priceStatus.textContent = `${prices.length} latest market record(s).`;
+      for (const price of prices) {
+        const row = document.createElement("tr");
+        for (const value of [price.commodity, price.district, price.market, price.price_date, Number(price.price_per_kg).toFixed(2)]) {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.append(cell);
+        }
+        priceRows.append(row);
+      }
+    }
+
+    function createListingCard(listing, owner = false) {
+      const card = document.createElement("article");
+      card.className = "card";
+      const top = document.createElement("div");
+      top.className = "card-top";
+      const title = document.createElement("h3");
+      title.textContent = listing.name;
+      const price = document.createElement("span");
+      price.className = "price";
+      price.textContent = `Rs ${Number(listing.price).toFixed(2)}/${listing.unit}`;
+      top.append(title, price);
+      const category = document.createElement("span");
+      category.className = "badge";
+      category.textContent = listing.category;
+      const shop = document.createElement("p");
+      shop.className = "shopline";
+      shop.textContent = owner ? `${listing.district} · ${listing.stock} in stock` : `${listing.shop_name} · ${listing.district}`;
+      const description = document.createElement("p");
+      description.className = "meta";
+      description.textContent = listing.description || "No additional details.";
+      card.append(top, category, shop, description);
+      if (!owner) {
+        const contact = document.createElement("a");
+        contact.className = "button";
+        contact.href = `https://wa.me/${listing.phone.replace(/\D/g, "")}`;
+        contact.target = "_blank";
+        contact.rel = "noopener noreferrer";
+        contact.textContent = "Contact shop on WhatsApp";
+        card.append(contact);
+      } else {
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "secondary";
+        edit.textContent = "Edit";
+        edit.addEventListener("click", () => startEditing(listing));
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "danger";
+        remove.textContent = "Delete";
+        remove.addEventListener("click", () => removeListing(listing.id));
+        actions.append(edit, remove);
+        card.append(actions);
+      }
+      return card;
+    }
+
+    async function loadMarketplace() {
+      marketStatus.textContent = "Loading local shop listings…";
+      marketListings.replaceChildren();
+      const params = new URLSearchParams();
+      const district = document.querySelector("#market-district").value;
+      const category = document.querySelector("#market-category").value;
+      const search = document.querySelector("#market-search").value.trim();
+      if (district) params.set("district", district);
+      if (category) params.set("category", category);
+      if (search) params.set("search", search);
+      const listings = await api(`/api/listings?${params}`);
+      if (!listings.length) {
+        marketStatus.textContent = "No matching shop listings yet. Shopkeepers can sign in below to publish prices.";
+        return;
+      }
+      marketStatus.textContent = `${listings.length} local listing(s).`;
+      for (const listing of listings) marketListings.append(createListingCard(listing));
+    }
+
+    function showAccountState() {
+      document.querySelector("#signed-out").classList.toggle("hidden", Boolean(currentUser));
+      document.querySelector("#seller-dashboard").classList.toggle("hidden", !currentUser);
+      const actions = document.querySelector("#account-actions");
+      actions.replaceChildren();
+      const link = document.createElement("a");
+      link.href = "#shop-account";
+      link.textContent = currentUser ? currentUser.shop_name : "Shopkeeper sign in";
+      actions.append(link);
+      if (currentUser) {
+        document.querySelector("#seller-welcome").textContent = `Welcome, ${currentUser.shop_name} · ${currentUser.district}`;
+      }
+    }
+
+    async function loadDashboard() {
+      const dashboard = await api("/api/dashboard");
+      currentUser = dashboard.shopkeeper;
+      showAccountState();
+      document.querySelector('select[name="district"]').value = currentUser.district;
+      document.querySelector("#my-listings").replaceChildren();
+      if (!dashboard.listings.length) {
+        dashboardStatus.textContent = "You have not published any listings yet.";
+      } else {
+        dashboardStatus.textContent = `${dashboard.listings.length} listing(s), including out-of-stock items.`;
+        for (const listing of dashboard.listings) {
+          document.querySelector("#my-listings").append(createListingCard(listing, true));
+        }
+      }
+    }
+
+    function formPayload(form) {
+      return Object.fromEntries(new FormData(form).entries());
+    }
+
+    function startEditing(listing) {
+      const form = document.querySelector("#listing-form");
+      editingListingId = listing.id;
+      for (const [name, value] of Object.entries(listing)) {
+        if (form.elements[name]) form.elements[name].value = value;
+      }
+      document.querySelector("#listing-form-title").textContent = "Edit grocery listing";
+      form.querySelector('button[type="submit"]').textContent = "Save changes";
+      document.querySelector("#cancel-edit").classList.remove("hidden");
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function resetListingForm() {
+      editingListingId = null;
+      const form = document.querySelector("#listing-form");
+      form.reset();
+      if (currentUser) form.elements.district.value = currentUser.district;
+      form.elements.stock.value = 1;
+      document.querySelector("#listing-form-title").textContent = "Publish a grocery listing";
+      form.querySelector('button[type="submit"]').textContent = "Publish listing";
+      document.querySelector("#cancel-edit").classList.add("hidden");
+    }
+
+    async function removeListing(id) {
+      if (!confirm("Delete this grocery listing?")) return;
+      try {
+        await api(`/api/listings/${id}`, { method: "DELETE" });
+        await Promise.all([loadDashboard(), loadMarketplace()]);
+      } catch (error) {
+        dashboardStatus.textContent = error.message;
+      }
+    }
+
+    document.querySelector("#market-district").addEventListener("change", () => loadMarketplace().catch(showMarketError));
+    document.querySelector("#market-category").addEventListener("change", () => loadMarketplace().catch(showMarketError));
+    let searchTimer;
+    document.querySelector("#market-search").addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => loadMarketplace().catch(showMarketError), 250);
+    });
+    priceDistrict.addEventListener("change", () => loadPrices().catch(error => { priceStatus.textContent = error.message; }));
+
+    function showMarketError(error) { marketStatus.textContent = error.message; }
+
+    document.querySelector("#register-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const payload = formPayload(form);
+      try {
+        await api("/api/auth/register", { method: "POST", body: JSON.stringify(payload) });
+        form.reset();
+        await loadDashboard();
+        document.querySelector("#seller-dashboard").scrollIntoView({ behavior: "smooth" });
+      } catch (error) {
+        form.querySelector("button").textContent = error.message;
+        setTimeout(() => { form.querySelector("button").textContent = "Create account"; }, 3000);
+      }
+    });
+
+    document.querySelector("#login-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector("button");
+      try {
+        await api("/api/auth/login", { method: "POST", body: JSON.stringify(formPayload(form)) });
+        form.reset();
+        await loadDashboard();
+      } catch (error) {
+        button.textContent = error.message;
+        setTimeout(() => { button.textContent = "Sign in"; }, 3000);
+      }
+    });
+
+    document.querySelector("#listing-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const payload = formPayload(form);
+      payload.price = Number(payload.price);
+      payload.stock = Number(payload.stock);
+      try {
+        await api(editingListingId ? `/api/listings/${editingListingId}` : "/api/listings", {
+          method: editingListingId ? "PUT" : "POST",
+          body: JSON.stringify(payload)
+        });
+        resetListingForm();
+        dashboardStatus.textContent = "Listing saved.";
+        await Promise.all([loadDashboard(), loadMarketplace()]);
+      } catch (error) {
+        dashboardStatus.textContent = error.message;
+      }
+    });
+
+    document.querySelector("#cancel-edit").addEventListener("click", resetListingForm);
+    document.querySelector("#logout-button").addEventListener("click", async () => {
+      await api("/api/auth/logout", { method: "POST" });
+      currentUser = null;
+      showAccountState();
+    });
+
+    document.querySelector("#subscribe-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      subscriptionStatus.textContent = "Saving subscription…";
+      const commodities = [...document.querySelectorAll('input[name="commodities"]:checked')].map(input => input.value);
+      try {
+        const result = await api("/api/subscribe", {
+          method: "POST",
+          body: JSON.stringify({
+            phone: document.querySelector("#subscription-phone").value,
+            district: document.querySelector("#subscription-district").value,
+            commodities,
+            consent: document.querySelector("#consent").checked
+          })
+        });
+        localStorage.setItem(savedSubscriptionKey, JSON.stringify({ phone: result.phone, manage_token: result.manage_token }));
+        subscriptionStatus.textContent = result.message;
+        document.querySelector("#manage-subscription").classList.remove("hidden");
+      } catch (error) {
+        subscriptionStatus.textContent = error.message;
+      }
+    });
+
+    document.querySelector("#unsubscribe-button").addEventListener("click", async () => {
+      const saved = localStorage.getItem(savedSubscriptionKey);
+      if (!saved) return;
+      subscriptionStatus.textContent = "Cancelling subscription…";
+      try {
+        const result = await api("/api/unsubscribe", { method: "POST", body: saved });
+        localStorage.removeItem(savedSubscriptionKey);
+        subscriptionStatus.textContent = result.message;
+        document.querySelector("#manage-subscription").classList.add("hidden");
+      } catch (error) {
+        subscriptionStatus.textContent = error.message;
+      }
+    });
+
+    async function initialize() {
+      await Promise.all([loadDistricts(), loadCategories()]);
+      await Promise.all([loadPrices(), loadMarketplace()]);
+      showAccountState();
+      try {
+        await loadDashboard();
+      } catch (error) {
+        if (!error.message.includes("sign in")) dashboardStatus.textContent = error.message;
+      }
+      if (localStorage.getItem(savedSubscriptionKey)) {
+        document.querySelector("#manage-subscription").classList.remove("hidden");
+      }
+    }
+    initialize().catch(error => {
+      priceStatus.textContent = error.message;
+      marketStatus.textContent = error.message;
+    });
+  </script>
+</body>
+</html>
