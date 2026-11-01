@@ -1,4 +1,4 @@
-# UP Mandi Grocery Price Alerts
+# Sales Report - UP Mandi Grocery Price Alerts
 
 A small web app that displays the latest available Uttar Pradesh mandi modal
 prices for selected grocery staples and stores WhatsApp daily-digest
